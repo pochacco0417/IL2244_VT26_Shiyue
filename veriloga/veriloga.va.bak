@@ -1,0 +1,60 @@
+// VerilogA for myproject, bgp_behavioral, veriloga
+
+`include "constants.vams"
+`include "disciplines.vams"
+
+module bgp_behavioral(vref, BIAS, GNDA, VDDA, EN);
+
+inout GNDA, VDDA;
+input BIAS, EN;
+output vref;
+electrical vref, GNDA, VDDA, EN, BIAS;
+
+
+parameter real vbe_300K = 0.7;
+parameter real tc_vbe = -0.0019;
+parameter real vt_300K = 0.026;
+parameter real k_over_q = 8.617e-5; //vt=kT/q
+parameter real PSRR_db = -60;
+parameter real ibias_req = 10u;
+parameter real en_th = 0.8;
+
+
+
+real vbe, vptat, vref_out;
+real T;
+real a; 
+real PSRR_gain;
+integer en_on;
+
+analog begin
+
+@(cross(V(EN, GNDA) - en_th))
+;
+if(V(EN, GNDA)>en_th)
+   en_on = 1;
+else
+   en_on = 0;
+
+I(BIAS, GNDA) <+ en_on * ibias_req;
+
+T = $temperature;
+a = -tc_vbe / k_over_q; // dvref/dT=0, vref=vbe+a*vt
+PSRR_gain = pow(10, PSRR_db/20.0);
+
+//CTAT
+vbe = vbe_300K + tc_vbe*(T-300);
+//PTAT
+vptat = a * $vt;
+//Vref = CTAT + PTAT
+vref_out = vbe + vptat;
+
+
+V(vref,GNDA) <+ transition(en_on*(vref_out + PSRR_gain * (V(VDDA,GNDA)-3.3)), 0, 10u);
+
+
+end
+
+
+
+endmodule
